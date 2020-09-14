@@ -60,12 +60,12 @@ def main():
     parser.add_argument('--do_dagger', action='store_true')
     parser.add_argument('--ep_len', type=int)
 
-    parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=1000)  # number of gradient steps for training policy (per iter in n_iter)
+    parser.add_argument('--num_agent_train_steps_per_iter', type=int, default=10000)  # number of gradient steps for training policy (per iter in n_iter)
     parser.add_argument('--n_iter', '-n', type=int, default=1)
 
     parser.add_argument('--batch_size', type=int, default=1000)  # training data collected (in the env) during each iteration
     parser.add_argument('--eval_batch_size', type=int,
-                        default=1000)  # eval data collected (in the env) for logging metrics
+                        default=10000)  # eval data collected (in the env) for logging metrics
     parser.add_argument('--train_batch_size', type=int,
                         default=100)  # number of sampled data points to be used per gradient/train step
 

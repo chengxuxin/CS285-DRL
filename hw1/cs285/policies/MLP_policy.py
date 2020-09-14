@@ -55,7 +55,8 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             self.mean_net = ptu.build_mlp(
                 input_size=self.ob_dim,
                 output_size=self.ac_dim,
-                n_layers=self.n_layers, size=self.size,
+                n_layers=self.n_layers, 
+                size=self.size,
             )
             self.mean_net.to(ptu.device)
             self.logstd = nn.Parameter(
@@ -78,10 +79,12 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         if len(obs.shape) > 1:
             observation = obs
         else:
-            observation = obs[None]
-
+            observation = obs[None]  # NOTE used to make observation of dim 2
         # TODO return the action that the policy prescribes
-        raise NotImplementedError
+        action = self(torch.from_numpy(observation).type(torch.float)).detach().numpy()
+        return action
+        
+        # return self.mean_net(torch.from_numpy(observation).type(torch.float)).detach().numpy()
 
     # update/train this policy
     def update(self, observations, actions, **kwargs):
@@ -93,7 +96,18 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
     # return more flexible objects, such as a
     # `torch.distributions.Distribution` object. It's up to you!
     def forward(self, observation: torch.FloatTensor) -> Any:
-        raise NotImplementedError
+        # normal_dist = torch.distributions.Normal(self.mean_net(observation.type(torch.float)), torch.exp(self.logstd))
+        # # print(observation.dim[0])
+        # samples = normal_dist.rsample()
+        # return samples
+        
+        mean = self.mean_net(observation)
+        return mean + torch.randn(mean.size()) * torch.exp(self.logstd)
+
+        # normal_dist = torch.distributions.MultivariateNormal(self.mean_net(observation.type(torch.float)), torch.exp(self.logstd))
+        # # # print(observation.dim[0])
+        # samples = normal_dist.rsample()
+        # return samples
 
 
 #####################################################
@@ -109,7 +123,13 @@ class MLPPolicySL(MLPPolicy):
             adv_n=None, acs_labels_na=None, qvals=None
     ):
         # TODO: update the policy and return the loss
-        loss = TODO
+        self.optimizer.zero_grad()
+        output_actions = self(torch.from_numpy(observations))
+        loss = self.loss(output_actions, torch.from_numpy(actions))
+        
+        loss.backward()
+        self.optimizer.step()
+        # print([p.grad for p in self.logstd])
         return {
             # You can add extra logging information here, but keep this line
             'Training Loss': ptu.to_numpy(loss),
