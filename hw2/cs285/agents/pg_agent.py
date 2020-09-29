@@ -16,6 +16,8 @@ class PGAgent(BaseAgent):
         self.standardize_advantages = self.agent_params['standardize_advantages']
         self.nn_baseline = self.agent_params['nn_baseline']
         self.reward_to_go = self.agent_params['reward_to_go']
+        self.gae = self.agent_params['gae']
+        self.lamb = self.agent_params['lambda']
 
         # actor/policy
         self.actor = MLPPolicyPG(
@@ -38,11 +40,29 @@ class PGAgent(BaseAgent):
             and the calculated qvals/advantages that come from the seen rewards.
         """
 
-        # step 1: calculate q values of each (s_t, a_t) point, using rewards (r_0, ..., r_t, ..., r_T)
-        q_values = self.calculate_q_vals(rewards_list)
+        if self.gae:
+            all_rewards = np.concatenate(rewards_list)
+            adv_gae = np.zeros_like(all_rewards)
+            pred_values = self.actor.run_baseline_prediction(observations)
+            pred_values_next = self.actor.run_baseline_prediction(next_observations)
+            next_adv_gae = 0
+            for t in reversed(range(all_rewards.shape[0])):
+                if terminals[t]:
+                    delta = all_rewards[t] -pred_values[t]
+                else:
+                    delta = all_rewards[t] + self.gamma * pred_values_next[t] - pred_values[t]
+                adv_gae[t] = delta + self.gamma * self.lamb * next_adv_gae
+                next_adv_gae = adv_gae[t]
+            q_values = adv_gae + pred_values
+            mean = np.mean(adv_gae)
+            std = np.std(adv_gae)
+            advantages = normalize(adv_gae, mean, std)
+        else:
+            # step 1: calculate q values of each (s_t, a_t) point, using rewards (r_0, ..., r_t, ..., r_T)
+            q_values = self.calculate_q_vals(rewards_list)
 
-        # step 2: calculate advantages that correspond to each (s_t, a_t) point
-        advantages = self.estimate_advantage(observations, q_values)
+            # step 2: calculate advantages that correspond to each (s_t, a_t) point
+            advantages = self.estimate_advantage(observations, q_values)
 
         # TODO: step 3: use all datapoints (s_t, a_t, q_t, adv_t) to update the PG actor/policy
         ## HINT: `train_log` should be returned by your actor update method
